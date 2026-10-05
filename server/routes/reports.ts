@@ -6,9 +6,11 @@ import { generateTicketId } from "../lib/ticketId";
 import { requireAdmin, requireModerator, requireActionable, SESSION_COOKIE_NAME } from "../middleware/requireAdmin";
 import { verifyAdminSession, AdminSession } from "../lib/jwt";
 import { logAudit } from "../lib/auditLog";
+import { sendNotificationEmail } from "../lib/email";
 import { generateReportsSummaryPdf, generateReportDetailPdf } from "../lib/reportPdf";
 import { divisionForCategory, categoriesForDivision } from "../../src/lib/divisions";
 import { ReportCategory, ReportStatus } from "../../src/types";
+import { PORTAL_LINK } from "../../src/utils/whatsapp";
 import type { Report, ReportComment } from "../../src/types";
 
 const router = Router();
@@ -379,6 +381,38 @@ router.post("/", (req, res) => {
   });
   run();
 
+  // Not awaited — email delivery is a courtesy, shouldn't delay the
+  // reporter's response. sendNotificationEmail catches its own errors.
+  const division = divisionForCategory(body.category as Report["category"]);
+  if (division) {
+    let moderators = db
+      .prepare("SELECT email, name FROM admin_users WHERE role = 'MODERATOR' AND division = ?")
+      .all(division) as { email: string; name: string | null }[];
+    // No Moderator registered for this division yet (e.g. its lead is
+    // currently Super Admin instead) — fall back to Super Admins so the
+    // report still notifies someone rather than nobody.
+    if (moderators.length === 0) {
+      moderators = db.prepare("SELECT email, name FROM admin_users WHERE role = 'SUPER_ADMIN'").all() as {
+        email: string;
+        name: string | null;
+      }[];
+    }
+    for (const moderator of moderators) {
+      sendNotificationEmail(
+        moderator.email,
+        `[Lapor FTI] Laporan Baru: ${id}`,
+        `Halo ${moderator.name || "Moderator"},\n\n` +
+          `Ada laporan baru masuk ke divisi Anda:\n\n` +
+          `Kode Tiket: ${id}\n` +
+          `Judul: ${body.title}\n` +
+          `Kategori: ${body.category}\n` +
+          `Urgensi: ${body.urgency}\n\n` +
+          `Silakan tinjau di panel admin:\n${PORTAL_LINK}\n\n` +
+          `_Email otomatis dari Lapor FTI, Fakultas Teknologi Industri UII._`
+      );
+    }
+  }
+
   const row = db.prepare("SELECT * FROM reports WHERE id = ?").get(id) as ReportRow;
   res.status(201).json(toReport(row));
 });
@@ -438,7 +472,7 @@ router.patch("/:id/disposition", requireModerator, (req, res) => {
 
   const assigneeEmail = parsed.data.assigneeEmail.toLowerCase();
   const assignee = db.prepare("SELECT * FROM admin_users WHERE email = ?").get(assigneeEmail) as
-    | { email: string; role: string; division: string | null }
+    | { email: string; name: string | null; role: string; division: string | null }
     | undefined;
   if (!assignee || assignee.role !== "STAFF") {
     return res.status(400).json({ error: "assignee_not_staff" });
@@ -460,6 +494,19 @@ router.patch("/:id/disposition", requireModerator, (req, res) => {
     targetId: req.params.id,
     details: `Didisposisikan ke ${assigneeEmail}${parsed.data.note ? `: ${parsed.data.note}` : ""}`,
   });
+
+  sendNotificationEmail(
+    assigneeEmail,
+    `[Lapor FTI] Tugas Baru: ${req.params.id}`,
+    `Halo ${assignee.name || "Staff"},\n\n` +
+      `Anda mendapat disposisi tugas baru dari ${req.admin!.email}:\n\n` +
+      `Kode Tiket: ${req.params.id}\n` +
+      `Judul: ${existing.title}\n` +
+      `Kategori: ${existing.category}\n` +
+      (parsed.data.note ? `Catatan: ${parsed.data.note}\n\n` : "\n") +
+      `Silakan tindak lanjuti di panel admin:\n${PORTAL_LINK}\n\n` +
+      `_Email otomatis dari Lapor FTI, Fakultas Teknologi Industri UII._`
+  );
 
   const row = db.prepare("SELECT * FROM reports WHERE id = ?").get(req.params.id) as ReportRow;
   res.json(toReport(row));

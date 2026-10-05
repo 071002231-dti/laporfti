@@ -2,7 +2,7 @@ import { Report, ReportStatus } from "../types";
 
 // Public-facing short link for the portal (redirects to production), used
 // in all outbound WhatsApp messages instead of the raw origin.
-const PORTAL_LINK = "https://s.id/LaporFTI";
+export const PORTAL_LINK = "https://uii.id/LaporFTI";
 
 /**
  * Clean phone number to international WhatsApp format (e.g. 0812... -> 62812...)

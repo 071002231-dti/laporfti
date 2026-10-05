@@ -13,6 +13,10 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 
 export function createApp() {
   const app = express();
+  // Trust the single nginx hop in front of Node so req.ip / X-Forwarded-For
+  // resolve to the real client IP instead of nginx's own socket — needed for
+  // express-rate-limit to key by client, not by "everyone behind nginx".
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
 

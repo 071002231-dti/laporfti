@@ -121,6 +121,8 @@ export interface AuthMe {
   name?: string;
   role?: AdminRole;
   division?: Division;
+  impersonating?: boolean;
+  impersonatedBy?: string;
 }
 
 export function getMe(): Promise<AuthMe> {
@@ -129,6 +131,19 @@ export function getMe(): Promise<AuthMe> {
 
 export async function logout(): Promise<void> {
   await request("/api/auth/logout", { method: "POST" });
+}
+
+// Super Admin-only "login as" — see server/routes/auth.ts for the audit-log
+// and access-control rules enforced server-side.
+export async function impersonate(email: string): Promise<{ ok: true }> {
+  return request("/api/auth/impersonate", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export async function endImpersonation(): Promise<{ ok: true }> {
+  return request("/api/auth/end-impersonation", { method: "POST" });
 }
 
 // Dev-only: log in as a dummy reporter account without going through Google

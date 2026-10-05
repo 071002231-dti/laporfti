@@ -1,8 +1,10 @@
 import { Router } from "express";
+import { z } from "zod";
 import { OAuth2Client } from "google-auth-library";
 import { db } from "../db/connection";
 import { signAdminSession, verifyAdminSession, AdminRole, AdminSession } from "../lib/jwt";
-import { SESSION_COOKIE_NAME } from "../middleware/requireAdmin";
+import { SESSION_COOKIE_NAME, requireLogin, requireSuperAdmin } from "../middleware/requireAdmin";
+import { logAudit } from "../lib/auditLog";
 import type { Division } from "../../src/lib/divisions";
 
 const router = Router();
@@ -162,6 +164,88 @@ router.post("/dev-login", (_req, res) => {
   res.json({ ok: true });
 });
 
+const impersonateSchema = z.object({ email: z.string().email() });
+
+// POST /api/auth/impersonate
+// Super Admin-only "login as" — lets them view/act as another account's
+// exact role for testing/support, without a shared secret: the new session
+// is signed under the same SESSION_SECRET as any normal login, just with an
+// impersonatedBy claim so end-impersonation can restore their own identity.
+// Capped to a short lifetime regardless of SESSION_MAX_AGE_HOURS as
+// defense-in-depth against a forgotten/abandoned impersonation session.
+router.post("/impersonate", requireSuperAdmin, (req, res) => {
+  const parsed = impersonateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: "invalid_payload", details: parsed.error.flatten() });
+  }
+  const targetEmail = parsed.data.email.toLowerCase();
+  const actor = req.admin!;
+
+  if (actor.impersonatedBy) {
+    return res.status(400).json({ error: "already_impersonating" });
+  }
+  if (targetEmail === actor.email.toLowerCase()) {
+    return res.status(400).json({ error: "cannot_impersonate_self" });
+  }
+  if (!isUiiOrgEmail(targetEmail)) {
+    return res.status(400).json({ error: "domain_not_allowed" });
+  }
+
+  const target = db.prepare("SELECT * FROM admin_users WHERE email = ?").get(targetEmail) as AdminUserRow | undefined;
+  if (target?.role === "SUPER_ADMIN") {
+    return res.status(403).json({ error: "cannot_impersonate_super_admin" });
+  }
+
+  const session: AdminSession = {
+    email: targetEmail,
+    name: target?.name ?? undefined,
+    role: target?.role,
+    division: target?.division ?? undefined,
+    impersonatedBy: actor.email,
+  };
+  const sessionToken = signAdminSession(session, { maxAgeHours: 1 });
+  res.cookie(SESSION_COOKIE_NAME, sessionToken, cookieOptions);
+
+  logAudit({
+    actorEmail: actor.email,
+    action: "IMPERSONATION_STARTED",
+    targetType: "admin_user",
+    targetId: targetEmail,
+    details: `Login sebagai ${targetEmail} (role: ${target?.role ?? "Pelapor"})`,
+  });
+
+  res.json({ ok: true });
+});
+
+// POST /api/auth/end-impersonation
+router.post("/end-impersonation", requireLogin, (req, res) => {
+  const session = req.admin!;
+  if (!session.impersonatedBy) {
+    return res.status(400).json({ error: "not_impersonating" });
+  }
+
+  const originalEmail = session.impersonatedBy;
+  const original = db.prepare("SELECT * FROM admin_users WHERE email = ?").get(originalEmail) as AdminUserRow | undefined;
+  const restored: AdminSession = {
+    email: originalEmail,
+    name: original?.name ?? undefined,
+    role: original?.role,
+    division: original?.division ?? undefined,
+  };
+  const sessionToken = signAdminSession(restored);
+  res.cookie(SESSION_COOKIE_NAME, sessionToken, cookieOptions);
+
+  logAudit({
+    actorEmail: originalEmail,
+    action: "IMPERSONATION_ENDED",
+    targetType: "admin_user",
+    targetId: session.email,
+    details: "Mengakhiri sesi login-sebagai",
+  });
+
+  res.json({ ok: true });
+});
+
 // GET /api/auth/me
 router.get("/me", (req, res) => {
   const token = req.cookies?.[SESSION_COOKIE_NAME];
@@ -169,7 +253,15 @@ router.get("/me", (req, res) => {
   if (!session) {
     return res.json({ authenticated: false });
   }
-  res.json({ authenticated: true, email: session.email, name: session.name, role: session.role, division: session.division });
+  res.json({
+    authenticated: true,
+    email: session.email,
+    name: session.name,
+    role: session.role,
+    division: session.division,
+    impersonating: !!session.impersonatedBy,
+    impersonatedBy: session.impersonatedBy,
+  });
 });
 
 // POST /api/auth/logout

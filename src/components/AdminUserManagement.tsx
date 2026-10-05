@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { UserPlus, Trash2, Users, LogOut } from "lucide-react";
+import { UserPlus, Trash2, Users, LogOut, UserCheck } from "lucide-react";
 import { AdminRole } from "../types";
 import { DIVISIONS, DIVISION_LABELS, Division } from "../lib/divisions";
 import { ORG_DIRECTORY } from "../lib/orgDirectory";
-import { getAdminUsers, inviteAdminUser, updateAdminUserRole, removeAdminUser, revokeAdminSession, AdminUserEntry } from "../lib/api";
+import { getAdminUsers, inviteAdminUser, updateAdminUserRole, removeAdminUser, revokeAdminSession, impersonate, AdminUserEntry } from "../lib/api";
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   SUPER_ADMIN: "Super Admin",
@@ -17,9 +17,10 @@ const DIVISION_REQUIRED_ROLES: AdminRole[] = ["MODERATOR", "STAFF"];
 interface AdminUserManagementProps {
   currentUserEmail?: string;
   onClose: () => void;
+  onRefreshAuth: () => Promise<void>;
 }
 
-export default function AdminUserManagement({ currentUserEmail, onClose }: AdminUserManagementProps) {
+export default function AdminUserManagement({ currentUserEmail, onClose, onRefreshAuth }: AdminUserManagementProps) {
   const [users, setUsers] = useState<AdminUserEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -110,6 +111,29 @@ export default function AdminUserManagement({ currentUserEmail, onClose }: Admin
     } catch (err) {
       setError("Gagal mengakhiri sesi akun.");
     }
+  };
+
+  const [impersonating, setImpersonating] = useState(false);
+  const [impersonateEmail, setImpersonateEmail] = useState("");
+
+  const handleImpersonate = async (email: string) => {
+    setImpersonating(true);
+    setError("");
+    try {
+      await impersonate(email);
+      await onRefreshAuth();
+      onClose();
+    } catch (err) {
+      setError("Gagal login sebagai akun tersebut.");
+    } finally {
+      setImpersonating(false);
+    }
+  };
+
+  const handleImpersonateOther = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!impersonateEmail.trim()) return;
+    await handleImpersonate(impersonateEmail.trim());
   };
 
   return (
@@ -237,6 +261,16 @@ export default function AdminUserManagement({ currentUserEmail, onClose }: Admin
                     ))}
                   </select>
                 )}
+                {u.role !== "SUPER_ADMIN" && u.email !== currentUserEmail && (
+                  <button
+                    onClick={() => handleImpersonate(u.email)}
+                    disabled={impersonating}
+                    title="Login sebagai akun ini (untuk pengujian/dukungan)"
+                    className="p-1.5 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 rounded-lg cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                  </button>
+                )}
                 <button
                   onClick={() => handleRevokeSession(u.email)}
                   disabled={u.email === currentUserEmail}
@@ -258,6 +292,25 @@ export default function AdminUserManagement({ currentUserEmail, onClose }: Admin
           ))}
         </div>
       )}
+
+      {/* Impersonate an arbitrary UII account (e.g. plain reporter, not in admin_users) */}
+      <form onSubmit={handleImpersonateOther} className="flex flex-col sm:flex-row gap-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+        <input
+          type="email"
+          value={impersonateEmail}
+          onChange={(e) => setImpersonateEmail(e.target.value)}
+          placeholder="email@uii.ac.id atau @students.uii.ac.id (login sebagai Pelapor)"
+          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+        />
+        <button
+          type="submit"
+          disabled={impersonating}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-lg text-xs font-bold cursor-pointer transition-all flex items-center justify-center gap-1.5 shrink-0"
+        >
+          <UserCheck className="w-3.5 h-3.5" />
+          Login sebagai
+        </button>
+      </form>
     </div>
   );
 }

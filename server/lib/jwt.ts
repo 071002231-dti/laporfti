@@ -14,6 +14,9 @@ export interface AdminSession {
   // Seconds-since-epoch the token was issued (standard JWT "iat" claim),
   // used to check the token against admin_users.session_revoked_at.
   iat?: number;
+  // Set only on an impersonation session: the Super Admin's own email, so
+  // end-impersonation can restore their identity without a session store.
+  impersonatedBy?: string;
 }
 
 function getSecret(): string {
@@ -22,8 +25,8 @@ function getSecret(): string {
   return secret;
 }
 
-export function signAdminSession(payload: AdminSession): string {
-  const maxAgeHours = Number(process.env.SESSION_MAX_AGE_HOURS) || 12;
+export function signAdminSession(payload: AdminSession, options?: { maxAgeHours?: number }): string {
+  const maxAgeHours = options?.maxAgeHours ?? (Number(process.env.SESSION_MAX_AGE_HOURS) || 12);
   return jwt.sign(payload, getSecret(), { expiresIn: `${maxAgeHours}h` });
 }
 
@@ -37,6 +40,7 @@ export function verifyAdminSession(token: string): AdminSession | null {
         role: (decoded as { role?: AdminRole }).role,
         division: (decoded as { division?: Division }).division,
         iat: (decoded as { iat?: number }).iat,
+        impersonatedBy: (decoded as { impersonatedBy?: string }).impersonatedBy,
       };
     }
     return null;

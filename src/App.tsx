@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { Report, ReportStatus, ReportComment, AdminRole } from "./types";
+import { AdminRole, Report, ReportStatus, ReportComment } from "./types";
 import * as api from "./lib/api";
-import PortalHeader from "./components/PortalHeader";
-import HomeView from "./components/HomeView";
-import ReportForm from "./components/ReportForm";
-import ReportTracker from "./components/ReportTracker";
-import MyReports from "./components/MyReports";
-import PublicFeed from "./components/PublicFeed";
 import AdminPanel from "./components/AdminPanel";
-import MobileBottomNav from "./components/MobileBottomNav";
-import LoginGate from "./components/LoginGate";
-import { Building2 } from "lucide-react";
-
+import { LoginGateChatbot } from "./chat/LoginGateChatbot";
+import { ChatLayout } from "./chat/ChatLayout";
 import { Division } from "./lib/divisions";
 
-type AuthState = { status: "loading" | "authenticated" | "unauthenticated"; email?: string; name?: string; role?: AdminRole; division?: Division };
+type AuthState = {
+  status: "loading" | "authenticated" | "unauthenticated";
+  email?: string;
+  name?: string;
+  role?: AdminRole;
+  division?: Division;
+  impersonating?: boolean;
+  impersonatedBy?: string;
+};
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  domain_not_allowed: "Login gagal: portal ini hanya untuk civitas akademika UII (email @uii.ac.id atau subdomainnya, misal @students.uii.ac.id).",
+  domain_not_allowed: "Login gagal: portal ini hanya untuk civitas akademika UII.",
   missing_code: "Login gagal: proses OAuth tidak lengkap. Silakan coba lagi.",
   no_id_token: "Login gagal: Google tidak mengembalikan token identitas. Silakan coba lagi.",
   no_email: "Login gagal: akun Google Anda tidak memiliki email yang dapat diverifikasi.",
@@ -25,14 +25,12 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 };
 
 export default function App() {
-  const [reports, setReports] = useState<Report[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("home");
-  const [searchTicketId, setSearchTicketId] = useState<string>("");
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [authErrorMsg, setAuthErrorMsg] = useState<string | null>(null);
-
-  const isLoggedIn = auth.status === "authenticated";
-  const isAdminUser = isLoggedIn && !!auth.role;
+  const [reports, setReports] = useState<Report[]>([]);
+  
+  // When true, force showing the AdminPanel even if we are in a chatbot layout
+  const [viewingAdmin, setViewingAdmin] = useState(false);
 
   const refreshReports = async () => {
     const data = await api.getReports();
@@ -43,7 +41,15 @@ export default function App() {
     const me = await api.getMe();
     setAuth(
       me.authenticated
-        ? { status: "authenticated", email: me.email, name: me.name, role: me.role, division: me.division }
+        ? {
+            status: "authenticated",
+            email: me.email,
+            name: me.name,
+            role: me.role,
+            division: me.division,
+            impersonating: me.impersonating,
+            impersonatedBy: me.impersonatedBy,
+          }
         : { status: "unauthenticated" }
     );
   };
@@ -61,12 +67,15 @@ export default function App() {
     }
   }, []);
 
-  // The whole app is gated behind login (see server/app.ts requireLogin), so
-  // only fetch reports once we know there's a valid session — otherwise every
-  // request 401s before the user even sees the login screen.
+  const isLoggedIn = auth.status === "authenticated";
+  const isAdmin = isLoggedIn && !!auth.role;
+
+  // Fetch reports when admin view is opened or logged in as admin
   useEffect(() => {
-    if (isLoggedIn) refreshReports();
-  }, [isLoggedIn]);
+    if (isLoggedIn && isAdmin) {
+      refreshReports();
+    }
+  }, [isLoggedIn, isAdmin]);
 
   const handleRequestLogin = () => {
     window.location.href = api.apiUrl("api/auth/google/start");
@@ -79,38 +88,34 @@ export default function App() {
 
   const handleLogout = async () => {
     await api.logout();
+    setViewingAdmin(false);
     setReports([]);
     await refreshAuth();
   };
 
-  // Submit report handler
-  const handleAddNewReport = async (
-    payload: Omit<Report, "id" | "status" | "createdAt" | "updatedAt" | "timeline" | "comments">
-  ): Promise<Report> => {
-    const created = await api.createReport(payload);
-    await refreshReports();
-    return created;
+  const handleEndImpersonation = async () => {
+    await api.endImpersonation();
+    setReports([]);
+    await refreshAuth();
   };
 
-  // Update status handler (Admin/Staff only)
   const handleUpdateStatusAndNote = async (ticketId: string, status: ReportStatus, note: string) => {
     await api.updateReportStatus(ticketId, status, note);
     await refreshReports();
   };
 
-  // Add discussion comment handler
   const handleAddComment = async (ticketId: string, comment: ReportComment) => {
     await api.addComment(ticketId, comment);
     await refreshReports();
   };
 
   if (auth.status === "loading") {
-    return <div className="min-h-screen bg-slate-50/70" id="lapor-fit-app-loading" />;
+    return <div className="min-h-screen bg-[#efeae2] dark:bg-[#0b141a]" />;
   }
 
   if (auth.status === "unauthenticated") {
     return (
-      <LoginGate
+      <LoginGateChatbot
         onLogin={handleRequestLogin}
         onDevLogin={handleDevLogin}
         errorMsg={authErrorMsg}
@@ -119,112 +124,61 @@ export default function App() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-slate-50/70 py-4 sm:py-6 px-3 sm:px-6 lg:px-8 text-slate-800 flex flex-col font-sans pb-20 md:pb-6" id="lapor-fit-app">
-      {/* Outer wrapper max-w-7xl matching responsive precision guidelines */}
-      <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col space-y-5 sm:space-y-6">
-
-        {/* Portal Breadcrumbs */}
-        <div className="flex items-center text-[11px] text-slate-400 font-semibold px-1">
-          <div className="flex items-center gap-1.5">
-            <Building2 className="w-3.5 h-3.5" />
-            <span>Portal FTI UII</span>
-            <span>&gt;</span>
-            <span className="text-slate-600">Lapor FTI (Aspirasi & Keluhan)</span>
+  // Render AdminPanel if explicitly viewing admin (e.g. they clicked "Panel Admin" in chat)
+  if (viewingAdmin && isAdmin) {
+    return (
+      <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans">
+        <div className="w-full max-w-6xl mx-auto space-y-6">
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="font-semibold text-slate-800">Panel Admin Lapor FTI</h2>
+            <button
+              onClick={() => setViewingAdmin(false)}
+              className="text-sm font-medium text-indigo-600 hover:text-indigo-800 cursor-pointer"
+            >
+              &larr; Kembali ke Chatbot
+            </button>
           </div>
-        </div>
 
-        {authErrorMsg && (
-          <div className="bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 rounded-xl text-xs font-semibold flex items-center justify-between gap-3">
-            <span>{authErrorMsg}</span>
-            <button onClick={() => setAuthErrorMsg(null)} className="text-rose-500 hover:text-rose-800 font-bold text-lg leading-none cursor-pointer">×</button>
+          <AdminPanel
+            reports={reports}
+            adminRole={auth.role}
+            adminEmail={auth.email}
+            adminDivision={auth.division}
+            onUpdateStatus={handleUpdateStatusAndNote}
+            onAddComment={handleAddComment}
+            onRefreshReports={refreshReports}
+            onRefreshAuth={refreshAuth}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[100dvh] w-screen overflow-hidden bg-[#efeae2] dark:bg-[#0b141a] sm:p-4 md:p-6 lg:p-8 flex items-center justify-center font-sans">
+      <div className="w-full h-full max-w-[1600px] shadow-2xl relative rounded-none sm:rounded-xl overflow-hidden flex flex-col">
+        {auth.impersonating && (
+          <div className="bg-amber-50 border-b border-amber-300 text-amber-900 px-4 py-2 text-xs font-semibold flex items-center justify-between shrink-0 z-50">
+            <span>
+              Diimpersonasi oleh {auth.impersonatedBy} sebagai {auth.email}
+            </span>
+            <button
+              onClick={handleEndImpersonation}
+              className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded cursor-pointer"
+            >
+              Akhiri Impersonasi
+            </button>
           </div>
         )}
 
-        {/* Dynamic Header */}
-        <PortalHeader
-          reports={reports}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          isAdmin={isAdminUser}
-          adminName={auth.name}
-          adminEmail={auth.email}
-          adminRole={auth.role}
+        <ChatLayout
+          userEmail={auth.email || ""}
+          userName={auth.name || "Civitas Akademika"}
+          isAdmin={isAdmin}
           onLogout={handleLogout}
+          onNavigateAdmin={() => setViewingAdmin(true)}
         />
-
-        {/* Main View Shell - dynamically routing requested tab */}
-        <main className="flex-1">
-          {isAdminUser ? (
-            <AdminPanel
-              reports={reports}
-              adminRole={auth.role}
-              adminEmail={auth.email}
-              adminDivision={auth.division}
-              onUpdateStatus={handleUpdateStatusAndNote}
-              onAddComment={handleAddComment}
-              onRefreshReports={refreshReports}
-            />
-          ) : (
-            <div className="transition-all duration-300">
-              {activeTab === "home" && (
-                <HomeView
-                  reports={reports}
-                  setActiveTab={setActiveTab}
-                  setSearchTicketId={setSearchTicketId}
-                />
-              )}
-              {activeTab === "create" && (
-                <ReportForm
-                  onSubmit={handleAddNewReport}
-                  setActiveTab={setActiveTab}
-                  setSearchTicketId={setSearchTicketId}
-                  defaultEmail={auth.email}
-                />
-              )}
-              {activeTab === "track" && (
-                <ReportTracker
-                  reports={reports}
-                  searchTicketId={searchTicketId}
-                  setSearchTicketId={setSearchTicketId}
-                  onAddComment={handleAddComment}
-                />
-              )}
-              {activeTab === "mine" && (
-                <MyReports
-                  reports={reports}
-                  userEmail={auth.email}
-                  setActiveTab={setActiveTab}
-                  setSearchTicketId={setSearchTicketId}
-                />
-              )}
-              {activeTab === "feed" && (
-                <PublicFeed
-                  reports={reports}
-                  setActiveTab={setActiveTab}
-                  setSearchTicketId={setSearchTicketId}
-                />
-              )}
-            </div>
-          )}
-        </main>
-
-        {/* Portal-Friendly Humble Footer */}
-        <footer className="text-center text-slate-400 text-[10px] pt-8 pb-4 border-t border-slate-200/50 space-y-1">
-          <p>© {new Date().getFullYear()} Fakultas Teknologi Industri • Universitas Islam Indonesia.</p>
-          <p className="font-medium text-slate-400">
-            Dikembangkan untuk meningkatkan tata kelola layanan prima, keterbukaan informasi, dan partisipasi mahasiswa.
-          </p>
-        </footer>
       </div>
-
-      {/* Floating Mobile Bottom Navigation Bar */}
-      <MobileBottomNav
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        isAdmin={isAdminUser}
-        onLogout={handleLogout}
-      />
     </div>
   );
 }

@@ -10,7 +10,7 @@
     "build": "vite build --mode production",
     "start": "NODE_ENV=production tsx server/index.ts",
     "preview": "vite preview",
-    "clean": "rm -rf dist data/*.db* uploads/*",
+    "clean": "node -e \"if(process.env.NODE_ENV==='production'){console.error('Refusing: NODE_ENV=production — clean would delete live uploads/db.');process.exit(1)}\" && rm -rf dist data/*.db* uploads/*",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,7 +20,7 @@
     "better-sqlite3": "^13.0.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.3",
-    "exceljs": "^4.4.0",
+    "exceljs": "^3.10.0",
     "express": "^4.21.2",
     "express-rate-limit": "^8.6.2",
     "google-auth-library": "^11.0.0",
@@ -28,6 +28,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "multer": "^2.2.0",
+    "nodemailer": "^9.1.1",
     "pdfkit": "^0.19.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
@@ -41,6 +42,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.2.0",
     "@types/node": "^22.14.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/pdfkit": "^0.17.6",
     "autoprefixer": "^10.4.21",
     "concurrently": "^10.0.4",

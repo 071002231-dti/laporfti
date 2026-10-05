@@ -91,7 +91,15 @@ export default function ReportForm({ onSubmit, setActiveTab, setSearchTicketId, 
       const result = await uploadFile(fileToUpload);
       setAttachment({ name: result.name, path: result.path });
     } catch (err) {
-      setUploadError("Gagal mengunggah lampiran. Silakan coba lagi.");
+      console.error("Upload error:", err);
+      const code = err instanceof Error ? err.message : "";
+      if (code === "file_too_large") {
+        setUploadError("Ukuran file melebihi batas 2MB.");
+      } else if (code === "unsupported_file_type") {
+        setUploadError("Tipe file tidak didukung. Gunakan gambar (PNG, JPG, GIF, WEBP) atau PDF.");
+      } else {
+        setUploadError("Gagal mengunggah lampiran. Silakan coba lagi.");
+      }
     } finally {
       setIsUploading(false);
     }

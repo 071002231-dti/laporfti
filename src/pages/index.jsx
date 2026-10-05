@@ -24,7 +24,7 @@ const categories = [
 const Header = () => (
     <header style={{ backgroundColor: '#FFFFFF', borderBottom: '1px solid #E0E0E0', padding: '2rem 0', textAlign: 'center' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            <h1 style={{ fontSize: '2.5rem', color: TEXT_COLOR }}>Lapor FIT</h1>
+            <h1 style={{ fontSize: '2.5rem', color: TEXT_COLOR }}>Lapor FTI</h1>
             <p style={{ color: '#555', fontSize: '1.1rem', marginTop: '0.5rem' }}>
                 Platform resmi FTI UII untuk Aspirasi dan Aduan Civitas Akademika. Terintegrasi dengan sistem akademik kampus.
             </p>
@@ -164,7 +164,7 @@ const DeanMessage = () => (
                 color: TEXT_COLOR,
                 lineHeight: '1.6'
             }}>
-                "Kami di FTI UII berdedikasi penuh untuk menjembatani suara Anda. Melalui Lapor FIT, kami memastikan setiap aspirasi didengar, ditindaklanjuti, dan direspons dengan integritas serta kehangatan."
+                "Kami di FTI UII berdedikasi penuh untuk menjembatani suara Anda. Melalui Lapor FTI, kami memastikan setiap aspirasi didengar, ditindaklanjuti, dan direspons dengan integritas serta kehangatan."
             </blockquote>
             <p style={{ marginTop: '1.5rem', fontSize: '1.1rem', fontWeight: 'bold', color: PURPLE_ACCENT }}>
                 — Dekanat FTI UII

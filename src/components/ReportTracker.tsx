@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Calendar, Clock, AlertTriangle, Send, Shield, CornerDownRight, FileText } from "lucide-react";
+import { Search, Calendar, Clock, AlertTriangle, Send, Shield, CornerDownRight, FileText, Download } from "lucide-react";
 import { Report, ReportStatus, UrgencyLevel, ReportComment } from "../types";
 import { apiUrl } from "../lib/api";
 
@@ -157,18 +157,39 @@ export default function ReportTracker({
                     <FileText className="w-4 h-4 text-indigo-600" />
                     <span>Lampiran Pendukung: {activeReport.attachmentName}</span>
                   </div>
-                  {activeReport.attachmentPath && /\.(png|jpe?g|gif|webp)$/i.test(activeReport.attachmentName || "") ? (
-                    <div className="max-w-md rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white p-1">
-                      <img
-                        src={apiUrl(`uploads/${activeReport.attachmentPath}`)}
-                        alt="Lampiran pendukung"
-                        className="w-full max-h-60 object-contain rounded"
-                        referrerPolicy="no-referrer"
-                      />
-                    </div>
-                  ) : (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-xs font-medium">
-                      File lampiran bertipe dokumen
+                  {activeReport.attachmentPath && (
+                    <div className="mt-2 space-y-2">
+                      {/\.(png|jpe?g|gif|webp)$/i.test(activeReport.attachmentName || "") ? (
+                        <a 
+                          href={apiUrl(`uploads/${activeReport.attachmentPath}`)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="block max-w-md rounded-lg overflow-hidden border border-slate-200 shadow-sm bg-white p-1 hover:border-indigo-400 transition-colors cursor-pointer"
+                        >
+                          <img
+                            src={apiUrl(`uploads/${activeReport.attachmentPath}`)}
+                            alt="Lampiran pendukung"
+                            className="w-full max-h-60 object-contain rounded"
+                            referrerPolicy="no-referrer"
+                          />
+                        </a>
+                      ) : (
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-xs font-medium">
+                          File lampiran bertipe dokumen
+                        </div>
+                      )}
+                      <div className="flex">
+                        <a
+                          href={apiUrl(`uploads/${activeReport.attachmentPath}`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download={activeReport.attachmentName}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-medium shadow-sm transition-colors"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                          Unduh Lampiran
+                        </a>
+                      </div>
                     </div>
                   )}
                 </div>

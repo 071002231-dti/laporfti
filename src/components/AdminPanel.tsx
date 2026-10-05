@@ -15,9 +15,10 @@ interface AdminPanelProps {
   onUpdateStatus: (ticketId: string, status: ReportStatus, note: string) => Promise<void>;
   onAddComment: (ticketId: string, comment: ReportComment) => Promise<void>;
   onRefreshReports: () => Promise<void>;
+  onRefreshAuth: () => Promise<void>;
 }
 
-export default function AdminPanel({ reports, adminRole, adminEmail, adminDivision, onUpdateStatus, onAddComment, onRefreshReports }: AdminPanelProps) {
+export default function AdminPanel({ reports, adminRole, adminEmail, adminDivision, onUpdateStatus, onAddComment, onRefreshReports, onRefreshAuth }: AdminPanelProps) {
   const isSuperAdmin = adminRole === "SUPER_ADMIN";
   // Can act on a report's status/replies: Super Admin, division Moderators, and
   // Staff executing a ticket disposed to them. Backend re-verifies per-report scope.
@@ -402,7 +403,7 @@ export default function AdminPanel({ reports, adminRole, adminEmail, adminDivisi
 
       {/* Admin User Management Card */}
       {showUserManagement && isSuperAdmin && (
-        <AdminUserManagement currentUserEmail={adminEmail} onClose={() => setShowUserManagement(false)} />
+        <AdminUserManagement currentUserEmail={adminEmail} onClose={() => setShowUserManagement(false)} onRefreshAuth={onRefreshAuth} />
       )}
 
       {/* Audit Log Card */}
@@ -602,14 +603,35 @@ export default function AdminPanel({ reports, adminRole, adminEmail, adminDivisi
                       <FileText className="w-4 h-4 text-indigo-600" />
                       <span>Lampiran Bukti: {selectedReport.attachmentName}</span>
                     </div>
-                    {selectedReport.attachmentPath && /\.(png|jpe?g|gif|webp)$/i.test(selectedReport.attachmentName || "") && (
-                      <div className="max-w-xs rounded overflow-hidden border border-slate-200 shadow-sm bg-white p-1">
-                        <img
-                          src={apiUrl(`uploads/${selectedReport.attachmentPath}`)}
-                          alt="Lampiran"
-                          className="w-full max-h-40 object-contain rounded"
-                          referrerPolicy="no-referrer"
-                        />
+                    {selectedReport.attachmentPath && (
+                      <div className="mt-2 space-y-2">
+                        {/\.(png|jpe?g|gif|webp)$/i.test(selectedReport.attachmentName || "") && (
+                          <a 
+                            href={apiUrl(`uploads/${selectedReport.attachmentPath}`)} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="block max-w-xs rounded overflow-hidden border border-slate-200 shadow-sm bg-white p-1 hover:border-indigo-400 transition-colors cursor-pointer"
+                          >
+                            <img
+                              src={apiUrl(`uploads/${selectedReport.attachmentPath}`)}
+                              alt="Lampiran"
+                              className="w-full max-h-40 object-contain rounded"
+                              referrerPolicy="no-referrer"
+                            />
+                          </a>
+                        )}
+                        <div className="flex">
+                          <a
+                            href={apiUrl(`uploads/${selectedReport.attachmentPath}`)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download={selectedReport.attachmentName}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-medium shadow-sm transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                            Unduh Lampiran
+                          </a>
+                        </div>
                       </div>
                     )}
                   </div>
