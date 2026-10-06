@@ -201,7 +201,9 @@ router.get("/", (req, res) => {
     ({ conditions, params } = buildAdminScopeFilter(session));
   } else if (!session && req.query.isPublic === "1") {
     // Unauthenticated request explicitly asking for the public feed subset.
-    conditions.push("is_public = 1");
+    // Must also require moderation approval — a PENDING report that hasn't
+    // been reviewed yet must not leak into the public-facing feed.
+    conditions.push("is_public = 1 AND moderation_status = 'APPROVED'");
   } else if (session && !session.role) {
     // Logged-in but non-admin (plain UII account, e.g. student/staff/dosen
     // reporter): the approved public feed, PLUS their own reports regardless

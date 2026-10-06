@@ -7,7 +7,9 @@ import uploadsRouter from "./routes/uploads";
 import settingsRouter from "./routes/settings";
 import authRouter from "./routes/auth";
 import adminUsersRouter from "./routes/adminUsers";
-import { requireLogin } from "./middleware/requireAdmin";
+import { requireLogin, SESSION_COOKIE_NAME } from "./middleware/requireAdmin";
+import { db } from "./db/connection";
+import { verifyAdminSession } from "./lib/jwt";
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 
@@ -35,6 +37,59 @@ export function createApp() {
 
   // /api/auth/* must stay reachable before login exists (start/callback/me/logout).
   app.use("/api/auth", authRouter);
+
+  // GET /api/reports?isPublic=1 — public feed, no login required.
+  //
+  // Only reports with is_public=1 AND moderation_status='APPROVED' are
+  // returned, so unauthenticated callers (landing page, public embeds) can
+  // read the approved feed without a UII account.
+  //
+  // Must be registered BEFORE the requireLogin fence below. When the
+  // caller IS authenticated, their session cookie is present and valid —
+  // in that case we fall through to the gated reportsRouter which already
+  // handles per-role scoping and includes the caller's own private reports.
+  app.get("/api/reports", (req, res, next) => {
+    if (req.query.isPublic !== "1") return next();
+
+    // Authenticated callers: fall through to requireLogin + reportsRouter.
+    const token = req.cookies?.[SESSION_COOKIE_NAME];
+    const session = token ? verifyAdminSession(token) : null;
+    if (session) return next();
+
+    // Genuinely unauthenticated: serve only APPROVED public reports.
+    // Reporter identity fields are intentionally omitted from this response
+    // to protect privacy (names, emails, WhatsApp are not exposed publicly).
+    type Row = Record<string, unknown>;
+    const rows = db
+      .prepare(
+        "SELECT * FROM reports WHERE is_public = 1 AND moderation_status = 'APPROVED' ORDER BY created_at DESC"
+      )
+      .all() as Row[];
+
+    const getTimeline = db.prepare(
+      "SELECT status, note, timestamp, actor_name FROM report_timeline WHERE report_id = ? ORDER BY id ASC"
+    );
+
+    const feed = rows.map((row) => ({
+      id: row.id,
+      title: row.title,
+      category: row.category,
+      status: row.status,
+      urgency: row.urgency,
+      isPublic: !!row.is_public,
+      moderationStatus: row.moderation_status,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      timeline: (getTimeline.all(row.id as string) as Row[]).map((t) => ({
+        status: t.status,
+        note: t.note,
+        timestamp: t.timestamp,
+        actorName: t.actor_name ?? undefined,
+      })),
+    }));
+
+    return res.json(feed);
+  });
 
   // Everything else requires a logged-in UII account (student or staff) —
   // the whole app is gated, not just the admin panel.
