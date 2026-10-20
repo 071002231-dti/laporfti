@@ -207,3 +207,31 @@ export function getAuditLog(filters?: { actorEmail?: string }): Promise<AuditLog
   const qs = query.toString();
   return request<AuditLogEntry[]>(`/api/admin-users/audit-log${qs ? `?${qs}` : ""}`);
 }
+
+// ── AI / Gemini proxy ────────────────────────────────────────────────────────
+// Semua panggilan ke Gemini diproksikan melalui server. Key tidak pernah
+// ada di kode ini — browser hanya memanggil endpoint internal /api/ai/chat.
+
+export interface AIChatHistoryItem {
+  role: "user" | "model";
+  parts: { text: string }[];
+}
+
+export interface AIChatResponse {
+  reply: string;
+}
+
+export interface AIChatError {
+  error: "ai_not_configured" | "ai_quota_exceeded" | "ai_upstream_error" | "invalid_payload";
+  message: string;
+}
+
+export async function askAI(
+  message: string,
+  history?: AIChatHistoryItem[]
+): Promise<AIChatResponse> {
+  return request<AIChatResponse>("/api/ai/chat", {
+    method: "POST",
+    body: JSON.stringify({ message, history }),
+  });
+}

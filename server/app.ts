@@ -7,6 +7,7 @@ import uploadsRouter from "./routes/uploads";
 import settingsRouter from "./routes/settings";
 import authRouter from "./routes/auth";
 import adminUsersRouter from "./routes/adminUsers";
+import aiRouter from "./routes/ai";
 import { requireLogin, SESSION_COOKIE_NAME } from "./middleware/requireAdmin";
 import { db } from "./db/connection";
 import { verifyAdminSession } from "./lib/jwt";
@@ -21,6 +22,49 @@ export function createApp() {
   app.set("trust proxy", 1);
   app.use(express.json({ limit: "1mb" }));
   app.use(cookieParser());
+
+  // ── Security headers ────────────────────────────────────────────────────────
+  // Applied to every response. In production nginx may add HSTS separately;
+  // sending it here is harmless and ensures it's present on all environments
+  // once NODE_ENV=production is set.
+  app.use((_req, res, next) => {
+    // Prevent clickjacking.
+    res.setHeader("X-Frame-Options", "DENY");
+    // Prevent MIME-type sniffing.
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    // Don't leak the full referrer to cross-origin destinations.
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    // Disable all features not needed by the app.
+    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    // HSTS: tell browsers to only connect over HTTPS for 1 year in production.
+    if (process.env.NODE_ENV === "production") {
+      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    }
+    // Content-Security-Policy: tight policy — allows only same-origin scripts,
+    // inline styles (needed by Tailwind CSS-in-JS), and Google accounts for
+    // OAuth redirects. Tighten further (remove 'unsafe-inline' styles) once
+    // Tailwind is configured to generate a static stylesheet.
+    res.setHeader(
+      "Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "script-src 'self'",
+        // Tailwind v4 uses a runtime style engine that injects inline styles.
+        // Replace with a nonce or hash once a static build is available.
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' https://fonts.gstatic.com",
+        // OAuth flow redirects through Google's accounts domain.
+        "connect-src 'self' https://accounts.google.com",
+        "img-src 'self' data:",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "base-uri 'self'",
+      ].join("; ")
+    );
+    next();
+  });
+  // ────────────────────────────────────────────────────────────────────────────
+
 
   const publicWriteLimiter = rateLimit({
     windowMs: 60 * 1000,
@@ -99,6 +143,7 @@ export function createApp() {
   app.use("/api/uploads", uploadsRouter);
   app.use("/api/settings", settingsRouter);
   app.use("/api/admin-users", adminUsersRouter);
+  app.use("/api/ai", aiRouter);
 
   app.use("/uploads", express.static(path.resolve(process.cwd(), UPLOAD_DIR)));
 

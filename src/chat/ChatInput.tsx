@@ -62,16 +62,21 @@ export const ChatInput: React.FC = () => {
         <div className="flex-1 bg-white dark:bg-[#2a3942] rounded-[20px] border-2 border-slate-200 dark:border-slate-600 px-5 py-3.5 flex items-end gap-2 shadow-[0_4px_15px_-3px_rgba(0,0,0,0.05)] focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/20 transition-all duration-200 group">
           <textarea
             ref={inputRef}
+            id="chat-input"
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
+            aria-label="Ketik pesan aduan Anda"
             rows={1}
+            maxLength={3000}
             disabled={isLoading}
-            className="flex-1 bg-transparent text-[14.5px] text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none max-h-40 leading-relaxed"
+            className="flex-1 bg-transparent text-[16px] text-slate-800 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 resize-none outline-none max-h-40 leading-relaxed"
           />
         </div>
         <button
+          id="chat-send-btn"
+          aria-label="Kirim pesan"
           onClick={handleSubmit}
           disabled={!input.trim() || isLoading}
           className={`w-[52px] h-[52px] rounded-2xl flex items-center justify-center transition-all duration-200 shrink-0 cursor-pointer border ${

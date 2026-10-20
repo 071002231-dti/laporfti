@@ -144,7 +144,13 @@ router.get("/google/callback", async (req, res) => {
 // whatever role (if any) is assigned to it in the local dev DB — plain
 // reporter by default, or a real role if you insert an admin_users row.
 router.post("/dev-login", (_req, res) => {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.NODE_ENV !== "development") {
+    // Log a warning so this unexpected hit is visible in server logs even
+    // if someone tries to probe this path in staging or production.
+    console.warn(
+      `[SECURITY] /api/auth/dev-login was called outside development (NODE_ENV=${process.env.NODE_ENV}). ` +
+        "Returning 404. Verify this endpoint is not reachable in production."
+    );
     return res.status(404).json({ error: "not_found" });
   }
 

@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { AdminRole, Report, ReportStatus, ReportComment } from "./types";
 import * as api from "./lib/api";
-import AdminPanel from "./components/AdminPanel";
+const AdminPanel = lazy(() => import("./components/AdminPanel"));
 import { LoginGateChatbot } from "./chat/LoginGateChatbot";
 import { ChatLayout } from "./chat/ChatLayout";
 import { Division } from "./lib/divisions";
@@ -54,8 +54,14 @@ export default function App() {
     );
   };
 
+  // Single effect: resolve auth state once, then fetch reports if admin —
+  // avoids the double /api/auth/me call that occurred when both effects ran
+  // independently on mount.
   useEffect(() => {
-    refreshAuth();
+    const init = async () => {
+      await refreshAuth();
+    };
+    init();
 
     const params = new URLSearchParams(window.location.search);
     const authError = params.get("authError");
@@ -70,21 +76,26 @@ export default function App() {
   const isLoggedIn = auth.status === "authenticated";
   const isAdmin = isLoggedIn && !!auth.role;
 
-  // Fetch reports when admin view is opened or logged in as admin
+  // Fetch reports only when transitioning into admin state — not on every render.
   useEffect(() => {
-    if (isLoggedIn && isAdmin) {
+    if (isAdmin) {
       refreshReports();
     }
-  }, [isLoggedIn, isAdmin]);
+  }, [isAdmin]);
 
   const handleRequestLogin = () => {
     window.location.href = api.apiUrl("api/auth/google/start");
   };
 
-  const handleDevLogin = async () => {
-    await api.devLogin();
-    await refreshAuth();
-  };
+  // Guarded behind import.meta.env.DEV so Vite's tree-shaker removes this
+  // entirely from production bundles — the function and its call-site both
+  // disappear, so the /api/auth/dev-login path is never shipped to users.
+  const handleDevLogin = import.meta.env.DEV
+    ? async () => {
+        await api.devLogin();
+        await refreshAuth();
+      }
+    : undefined;
 
   const handleLogout = async () => {
     await api.logout();
@@ -124,7 +135,8 @@ export default function App() {
     );
   }
 
-  // Render AdminPanel if explicitly viewing admin (e.g. they clicked "Panel Admin" in chat)
+  // Render AdminPanel if explicitly viewing admin (e.g. they clicked "Panel Admin" in chat).
+  // Lazily loaded via React.lazy so the Admin chunk is only downloaded when needed.
   if (viewingAdmin && isAdmin) {
     return (
       <div className="min-h-screen bg-slate-50/70 p-4 sm:p-6 lg:p-8 font-sans">
@@ -139,16 +151,20 @@ export default function App() {
             </button>
           </div>
 
-          <AdminPanel
-            reports={reports}
-            adminRole={auth.role}
-            adminEmail={auth.email}
-            adminDivision={auth.division}
-            onUpdateStatus={handleUpdateStatusAndNote}
-            onAddComment={handleAddComment}
-            onRefreshReports={refreshReports}
-            onRefreshAuth={refreshAuth}
-          />
+          <Suspense fallback={
+            <div className="flex items-center justify-center h-48 text-slate-500 text-sm">Memuat panel admin…</div>
+          }>
+            <AdminPanel
+              reports={reports}
+              adminRole={auth.role}
+              adminEmail={auth.email}
+              adminDivision={auth.division}
+              onUpdateStatus={handleUpdateStatusAndNote}
+              onAddComment={handleAddComment}
+              onRefreshReports={refreshReports}
+              onRefreshAuth={refreshAuth}
+            />
+          </Suspense>
         </div>
       </div>
     );

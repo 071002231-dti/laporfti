@@ -34,6 +34,10 @@ const ChatLayoutInner: React.FC<{
         <div className="h-14 sm:h-16 flex items-center px-3 sm:px-4 bg-slate-100 dark:bg-[#202c33] border-b border-slate-200 dark:border-slate-800 shrink-0 z-10 gap-3">
           {/* Mobile menu toggle */}
           <button
+            id="mobile-menu-toggle"
+            aria-label={mobileMenuOpen ? "Tutup menu" : "Buka menu"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-menu"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden text-slate-600 dark:text-slate-400 cursor-pointer"
           >
@@ -54,7 +58,11 @@ const ChatLayoutInner: React.FC<{
 
         {/* Mobile dropdown menu */}
         {mobileMenuOpen && (
-          <div className="absolute top-14 left-0 right-0 z-20 bg-white dark:bg-[#1a2734] border-b border-slate-200 dark:border-slate-700 shadow-lg md:hidden">
+          <nav
+            id="mobile-menu"
+            aria-label="Menu navigasi mobile"
+            className="absolute top-14 left-0 right-0 z-20 bg-white dark:bg-[#1a2734] border-b border-slate-200 dark:border-slate-700 shadow-lg md:hidden"
+          >
             <div className="p-3 border-b border-slate-100 dark:border-slate-800">
               <p className="text-[12px] font-semibold text-slate-800 dark:text-slate-200">{userName}</p>
               <p className="text-[10px] text-slate-500">{userEmail}</p>
@@ -71,11 +79,14 @@ const ChatLayoutInner: React.FC<{
             >
               <LogOut className="w-4 h-4" /> Logout
             </button>
-          </div>
+          </nav>
         )}
 
-        {/* Chat View */}
-        <ChatView />
+        {/* Chat View — wrapped in <main> for landmark + sr-only heading for screen readers */}
+        <main aria-label="Area percakapan Lapor FTI">
+          <h1 className="sr-only">Portal Aduan Lapor FTI — Fakultas Teknologi Industri UII</h1>
+          <ChatView />
+        </main>
       </div>
     </div>
   );
