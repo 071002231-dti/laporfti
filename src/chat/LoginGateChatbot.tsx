@@ -1,5 +1,6 @@
 import React from "react";
 import { Award, LogIn, Building2, FlaskConical, ShieldCheck } from "lucide-react";
+import { ThemeToggle } from "../lib/theme";
 
 interface LoginGateProps {
   onLogin: () => void;
@@ -20,7 +21,10 @@ export const LoginGateChatbot: React.FC<LoginGateProps> = ({
   onDismissError,
 }) => {
   return (
-    <div className="min-h-screen bg-[#efeae2] dark:bg-[#0b141a] flex items-center justify-center p-4 sm:p-6 font-sans">
+    <div className="min-h-screen bg-[#efeae2] dark:bg-[#0b141a] flex items-center justify-center p-4 sm:p-6 font-sans relative">
+      <div className="fixed top-4 right-4 z-50">
+        <ThemeToggle />
+      </div>
       <div className="w-full max-w-md bg-white dark:bg-[#111b21] rounded-2xl shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-slate-100 dark:bg-[#202c33] px-6 py-8 flex flex-col items-center justify-center border-b border-slate-200 dark:border-slate-800">

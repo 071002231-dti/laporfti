@@ -5,6 +5,7 @@ const AdminPanel = lazy(() => import("./components/AdminPanel"));
 import { LoginGateChatbot } from "./chat/LoginGateChatbot";
 import { ChatLayout } from "./chat/ChatLayout";
 import { Division } from "./lib/divisions";
+import { applyTheme, getStoredTheme } from "./lib/theme";
 
 type AuthState = {
   status: "loading" | "authenticated" | "unauthenticated";
@@ -54,10 +55,10 @@ export default function App() {
     );
   };
 
-  // Single effect: resolve auth state once, then fetch reports if admin —
-  // avoids the double /api/auth/me call that occurred when both effects ran
-  // independently on mount.
+  // Single effect: resolve auth state once, apply theme, then fetch reports if admin
   useEffect(() => {
+    applyTheme(getStoredTheme());
+
     const init = async () => {
       await refreshAuth();
     };

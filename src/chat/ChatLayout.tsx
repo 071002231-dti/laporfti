@@ -3,6 +3,7 @@ import { ChatProvider, useChat } from "./ChatContext";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatView } from "./ChatView";
 import { Award, ShieldCheck, RotateCcw, LogOut, Menu, X } from "lucide-react";
+import { ThemeToggle } from "../lib/theme";
 
 interface ChatLayoutProps {
   userEmail: string;
@@ -29,7 +30,7 @@ const ChatLayoutInner: React.FC<{
       />
 
       {/* Main chat area */}
-      <div className="flex-1 flex flex-col relative bg-[#efeae2] dark:bg-[#0b141a] min-w-0">
+      <div className="flex-1 flex flex-col relative bg-[#efeae2] dark:bg-[#0b141a] min-w-0 h-full overflow-hidden">
         {/* Chat Header */}
         <div className="h-14 sm:h-16 flex items-center px-3 sm:px-4 bg-slate-100 dark:bg-[#202c33] border-b border-slate-200 dark:border-slate-800 shrink-0 z-10 gap-3">
           {/* Mobile menu toggle */}
@@ -44,7 +45,7 @@ const ChatLayoutInner: React.FC<{
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
 
-          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center shrink-0 shadow-xs">
             <Award className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0 flex-1">
@@ -53,6 +54,12 @@ const ChatLayoutInner: React.FC<{
               <ShieldCheck className="w-3 h-3 text-emerald-500" />
               Akun Resmi — Fakultas Teknologi Industri UII
             </div>
+          </div>
+
+          {/* Theme toggle in header */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle className="hidden sm:flex" />
+            <ThemeToggle variant="icon" className="sm:hidden" />
           </div>
         </div>
 
@@ -66,6 +73,9 @@ const ChatLayoutInner: React.FC<{
             <div className="p-3 border-b border-slate-100 dark:border-slate-800">
               <p className="text-[12px] font-semibold text-slate-800 dark:text-slate-200">{userName}</p>
               <p className="text-[10px] text-slate-500">{userEmail}</p>
+            </div>
+            <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
+              <ThemeToggle variant="full" />
             </div>
             <button
               onClick={() => { clearChat(); setMobileMenuOpen(false); }}
@@ -83,7 +93,10 @@ const ChatLayoutInner: React.FC<{
         )}
 
         {/* Chat View — wrapped in <main> for landmark + sr-only heading for screen readers */}
-        <main aria-label="Area percakapan Lapor FTI">
+        <main
+          aria-label="Area percakapan Lapor FTI"
+          className="flex-1 flex flex-col min-h-0 relative overflow-hidden"
+        >
           <h1 className="sr-only">Portal Aduan Lapor FTI — Fakultas Teknologi Industri UII</h1>
           <ChatView />
         </main>
