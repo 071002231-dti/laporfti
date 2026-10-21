@@ -1,7 +1,19 @@
-import React, { useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { Sun, Moon } from "lucide-react";
 
 export const THEME_STORAGE_KEY = "fti_dark_mode";
+
+interface ThemeContextType {
+  isDark: boolean;
+  toggleTheme: () => void;
+  setTheme: (dark: boolean) => void;
+}
+
+const ThemeContext = createContext<ThemeContextType>({
+  isDark: true,
+  toggleTheme: () => {},
+  setTheme: () => {},
+});
 
 /**
  * Returns true if the stored theme preference is dark.
@@ -13,8 +25,7 @@ export function getStoredTheme(): boolean {
   if (stored !== null) {
     return stored === "true";
   }
-  // Default to system preference if available, otherwise dark
-  return window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)").matches : true;
+  return true;
 }
 
 /**
@@ -35,9 +46,9 @@ export function applyTheme(isDark: boolean): void {
 }
 
 /**
- * Hook to read and toggle current theme state.
+ * Context Provider so all buttons across header, sidebar, and login share one reactive state.
  */
-export function useTheme() {
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isDark, setIsDark] = useState<boolean>(getStoredTheme);
 
   useEffect(() => {
@@ -56,8 +67,20 @@ export function useTheme() {
   }, []);
 
   const toggleTheme = () => setIsDark((prev) => !prev);
+  const setTheme = (dark: boolean) => setIsDark(dark);
 
-  return { isDark, toggleTheme };
+  return (
+    <ThemeContext.Provider value={{ isDark, toggleTheme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};
+
+/**
+ * Hook to consume the shared theme context.
+ */
+export function useTheme() {
+  return useContext(ThemeContext);
 }
 
 /**

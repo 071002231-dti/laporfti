@@ -5,7 +5,7 @@ const AdminPanel = lazy(() => import("./components/AdminPanel"));
 import { LoginGateChatbot } from "./chat/LoginGateChatbot";
 import { ChatLayout } from "./chat/ChatLayout";
 import { Division } from "./lib/divisions";
-import { applyTheme, getStoredTheme } from "./lib/theme";
+import { ThemeProvider } from "./lib/theme";
 
 type AuthState = {
   status: "loading" | "authenticated" | "unauthenticated";
@@ -25,7 +25,7 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   oauth_failed: "Login gagal karena kesalahan teknis. Silakan coba lagi.",
 };
 
-export default function App() {
+function AppContent() {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [authErrorMsg, setAuthErrorMsg] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
@@ -55,10 +55,8 @@ export default function App() {
     );
   };
 
-  // Single effect: resolve auth state once, apply theme, then fetch reports if admin
+  // Single effect: resolve auth state once, then fetch reports if admin
   useEffect(() => {
-    applyTheme(getStoredTheme());
-
     const init = async () => {
       await refreshAuth();
     };
@@ -199,3 +197,12 @@ export default function App() {
     </div>
   );
 }
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
+  );
+}
+
