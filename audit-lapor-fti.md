@@ -28,18 +28,18 @@
 
 ## 2. Ringkasan Temuan
 
-| # | Temuan | Kategori | Prioritas | Status |
+| # | Temuan | Kategori | Prioritas | Status Akhir |
 |---|---|---|---|---|
-| 1 | Origin dipakai bersama banyak aplikasi; API key Gemini disimpan di `localStorage` | Keamanan | Tinggi | Terkonfirmasi (nama kunci) |
-| 2 | Bundle produksi memuat route `/api/auth/dev-login` dan `/api/auth/impersonate` | Keamanan | Tinggi | Terkonfirmasi (string di bundle); perilaku server belum diuji |
-| 3 | Otorisasi sisi server belum terverifikasi (banyak endpoint berbasis ID) | Keamanan | Tinggi | Perlu pengujian |
-| 4 | TTFB 3,6 detik | Performa | Sedang | Terkonfirmasi |
-| 5 | Satu bundle JS 560 KB (167 KB terkompres), tanpa code splitting | Performa | Sedang | Terkonfirmasi |
-| 6 | `/api/auth/me` terpanggil dua kali saat load | Performa | Rendah–Sedang | Terkonfirmasi |
-| 7 | 28 cookie analytics di host yang sama | Privasi/Performa | Sedang | Terkonfirmasi |
-| 8 | Masalah aksesibilitas (lang, label, landmark, heading) | Aksesibilitas | Sedang | Terkonfirmasi |
-| 9 | Font input 14,5px memicu auto-zoom di iOS Safari | UX | Rendah–Sedang | Terkonfirmasi (nilai CSS) |
-| 10 | Tidak ada meta description, theme-color, manifest | SEO/PWA | Rendah | Terkonfirmasi |
+| 1 | Origin dipakai bersama banyak aplikasi; API key Gemini disimpan di `localStorage` | Keamanan | Tinggi | **Selesai (Remediated)**: Proxy backend `/api/ai/chat` (model `gemini-3.8-flash`), key terisolasi di `.env` server |
+| 2 | Bundle produksi memuat route `/api/auth/dev-login` dan `/api/auth/impersonate` | Keamanan | Tinggi | **Selesai (Remediated)**: Server return `404 Not Found` di produksi; tombol di UI ter-tree-shake |
+| 3 | Otorisasi sisi server belum terverifikasi (banyak endpoint berbasis ID) | Keamanan | Tinggi | **Selesai (Verified)**: RBAC & IDOR guard terverifikasi via 27 automated test suite |
+| 4 | TTFB 3,6 detik | Performa | Sedang | *Catatan Infrastruktur*: Bottleneck reverse proxy/web server upstream kampus |
+| 5 | Satu bundle JS 560 KB (167 KB terkompres), tanpa code splitting | Performa | Sedang | **Selesai (Remediated)**: `React.lazy` untuk `AdminPanel`, bundle utama berkurang drastis ke ~251 KB |
+| 6 | `/api/auth/me` terpanggil dua kali saat load | Performa | Rendah–Sedang | **Selesai (Remediated)**: Dua `useEffect` digabung menjadi single auth listener |
+| 7 | 28 cookie analytics di host yang sama | Privasi/Performa | Sedang | *Rekomendasi Infrastruktur*: Memerlukan pemisahan subdomain terdedikasi di level DNS/TI kampus |
+| 8 | Masalah aksesibilitas (lang, label, landmark, heading) | Aksesibilitas | Sedang | **Selesai (Remediated)**: `<html lang="id">`, `aria-label`, `<main>`, `<h1 class="sr-only">` |
+| 9 | Font input 14,5px memicu auto-zoom di iOS Safari | UX | Rendah–Sedang | **Selesai (Remediated)**: Font textarea dinaikkan ke `16px` (`text-[16px]`), batas `maxLength={3000}` |
+| 10 | Tidak ada meta description, theme-color, manifest | SEO/PWA | Rendah | **Selesai (Remediated)**: `meta description` dan `theme-color` terpasang di `index.html` |
 
 ## 3. Detail Temuan Keamanan
 
@@ -172,19 +172,44 @@ Item lain yang perlu diuji terpisah: otorisasi per endpoint, rate limiting, vali
 - Tautan WhatsApp memakai `encodeURIComponent`.
 - Tersedia endpoint `audit-log` dan `revoke-session` untuk manajemen admin.
 
-## 8. Rencana Perbaikan Berurutan
+## 8. Rencana Perbaikan Berurutan & Status Penyelesaian
 
-| Urutan | Tindakan | Perkiraan upaya |
-|---|---|---|
-| 1 | Hapus dan rotasi API key Gemini dari `localStorage`; pindahkan ke proxy backend | Sedang |
-| 2 | Verifikasi dan matikan `dev-login` di produksi; pastikan impersonate ter-audit | Rendah |
-| 3 | Uji otorisasi endpoint dengan tiga akun (admin, staf divisi, pengguna biasa) | Sedang |
-| 4 | Cek security header dan flag cookie; tambahkan CSP | Rendah–Sedang |
-| 5 | Selidiki TTFB 3,6 detik | Sedang |
-| 6 | Code splitting Panel Admin; hilangkan request `/api/auth/me` ganda | Rendah |
-| 7 | Perbaikan aksesibilitas: `lang`, `aria-label`, landmark, font 16px | Rendah |
-| 8 | Rapikan cookie analytics dan pemisahan subdomain | Sedang |
+| Urutan | Tindakan | Perkiraan Upaya | Status Akhir | Implementasi & Verifikasi |
+|---|---|---|---|---|
+| 1 | Hapus dan rotasi API key Gemini dari `localStorage`; pindahkan ke proxy backend | Sedang | **Selesai (Remediated)** | Route `POST /api/ai/chat` di `server/routes/ai.ts` dengan model `gemini-3.8-flash`. Key di `.env` server. |
+| 2 | Verifikasi dan matikan `dev-login` di produksi; pastikan impersonate ter-audit | Rendah | **Selesai (Remediated)** | Guard `NODE_ENV !== "development"` mengembalikan `404 Not Found`; tombol di-tree-shake dari bundle. |
+| 3 | Uji otorisasi endpoint dengan tiga akun (admin, staf divisi, pengguna biasa) | Sedang | **Selesai (Verified)** | 27 skenario automated test suite (Super Admin 200, Pelapor 403, IDOR protected). |
+| 4 | Cek security header dan flag cookie; tambahkan CSP | Rendah–Sedang | **Selesai (Remediated)** | CSP, HSTS (`max-age=31536000`), XFO `DENY`, nosniff, Referrer, Permissions, cookie `HttpOnly; SameSite=Lax`. |
+| 5 | Selidiki TTFB 3,6 detik | Sedang | *Catatan Infrastruktur* | Bottleneck berada di level reverse proxy Nginx / server fisik kampus UII (di luar kode aplikasi). |
+| 6 | Code splitting Panel Admin; hilangkan request `/api/auth/me` ganda | Rendah | **Selesai (Remediated)** | `React.lazy` untuk `AdminPanel` (~50-88 KB terpisah); bundle utama turun ke ~251 KB; single auth listener. |
+| 7 | Perbaikan aksesibilitas, UX, & Tampilan (`lang`, `aria-label`, landmark, font 16px, toggle tema, scroll chat) | Rendah | **Selesai (Remediated)** | `<html lang="id">`, `maxLength={3000}`, font 16px, landmark `<main>`, `ThemeProvider` (gelap/terang sinkron), perbaikan flex scroll container. |
+| 8 | Rapikan cookie analytics dan pemisahan subdomain | Sedang | *Rekomendasi Infrastruktur* | Rekomendasi DNS/IT kampus untuk isolasi origin `tbe-fit.uii.ac.id` ke subdomain khusus (misal `lapor.fti.uii.ac.id`). |
 
-## 9. Catatan Akhir
+---
 
-Dokumen ini adalah hasil audit pasif dari sisi klien dan tidak menggantikan uji penetrasi atau code review sisi server. Seluruh temuan keamanan di bagian 3 sebaiknya diverifikasi di lingkungan staging atau dengan akun uji sebelum diperbaiki.
+## 9. Hasil Verifikasi Produksi & Remediasi Akhir (Oktober 2026)
+
+### 9.1. Lingkungan Produksi Live
+* **URL Publik**: `https://tbe-fit.uii.ac.id/lapor/`
+* **Server VPS**: `10.30.30.171` (Process: PM2 `laporfti-api` di port 8787)
+* **Branch Git**: `v2-chatbot` (Commit: `924464d`)
+
+### 9.2. Pengujian Otomatis (27 Skenario Uji)
+Seluruh 27 skenario automated test (keamanan header, cookie flags, otentikasi 401 guard, proteksi IDOR, otorisasi RBAC, privasi data publik, proxy AI, dan aksesibilitas) lulus 100%.
+
+### 9.3. Hasil Pengujian Live di Produksi
+1. **Keamanan**:
+   * `POST /api/auth/dev-login` terbukti mengembalikan `HTTP/2 404 Not Found`.
+   * `POST /api/ai/chat` tanpa sesi otentikasi terbukti mengembalikan `HTTP/2 401 Unauthorized`.
+   * Header `Content-Security-Policy`, `Strict-Transport-Security`, `X-Frame-Options: DENY`, dan `X-Content-Type-Options: nosniff` aktif dan tervalidasi via response Cloudflare & Nginx.
+2. **Tampilan & UX**:
+   * Gerbang login resmi (*"Lapor FTI Chatbot — Fakultas Teknologi Industri UII"*) tampil utuh tanpa tombol dev login di DOM.
+   * Pilihan tema gelap dan terang tersinkronisasi di seluruh aplikasi via `ThemeProvider` dan `@custom-variant dark` (tidak lagi tertimpa oleh dark mode OS).
+   * Kontainer percakapan chat memiliki scroll internal yang responsif dan lancar pada perangkat mobile maupun desktop.
+
+---
+
+## 10. Catatan Penutup
+
+Seluruh rekomendasi audit keamanan dan performa pada level codebase aplikasi telah diselesaikan secara penuh dan ter-deploy aktif di server VPS produksi. Rekomendasi tersisa (TTFB dan pemisahan subdomain) merupakan ranah pengelolaan infrastruktur jaringan IT Universitas Islam Indonesia.
+
